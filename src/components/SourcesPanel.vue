@@ -342,8 +342,8 @@ const shapes: Array<{ id: LayerShape; label: string }> = [
           >
             <Camera :size="18" color="#3D6FA5" />
             <div>
-              <div class="pick-title">Capture Card USB / Webcam (Default)</div>
-              <div class="pick-sub">Membuka kamera atau capture card UVC bawaan sistem</div>
+              <div class="pick-title">Capture Card USB / Webcam / HP via Kabel USB</div>
+              <div class="pick-sub">Mendukung Capture Card UVC, Webcam, atau ponsel Android (mode USB Webcam / HDMI Capture)</div>
             </div>
           </button>
 

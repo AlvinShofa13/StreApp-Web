@@ -494,6 +494,19 @@ async function openScreenPicker(): Promise<void> {
   pointer-events: auto;
 }
 
+.info-pill {
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: rgba(15, 23, 34, 0.72);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .overlay-btn {
   display: inline-flex;
   align-items: center;
@@ -508,21 +521,14 @@ async function openScreenPicker(): Promise<void> {
   font-weight: 600;
   cursor: pointer;
   backdrop-filter: blur(6px);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .overlay-btn:hover,
 .overlay-btn.active {
   background: rgba(61, 111, 165, 0.9);
   border-color: rgba(255, 255, 255, 0.35);
-}
-
-.info-pill {
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: rgba(15, 23, 34, 0.72);
-  color: #FFFFFF;
-  font-size: 11px;
-  font-weight: 600;
 }
 
 .projector-pill {

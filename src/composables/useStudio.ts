@@ -730,7 +730,11 @@ export function useStudio() {
   const onFsChange = () => {
     isFullscreen.value = Boolean(document.fullscreenElement)
   }
+  const onDeviceChange = () => {
+    void refreshDevices()
+  }
   document.addEventListener('fullscreenchange', onFsChange)
+  navigator.mediaDevices?.addEventListener?.('devicechange', onDeviceChange)
 
   const tickId = window.setInterval(() => {
     audioChannels.value = audioMixer.getChannelsSnapshot()
@@ -750,6 +754,7 @@ export function useStudio() {
   onBeforeUnmount(() => {
     window.clearInterval(tickId)
     document.removeEventListener('fullscreenchange', onFsChange)
+    navigator.mediaDevices?.removeEventListener?.('devicechange', onDeviceChange)
     chatClient.disconnect()
     projectorManager.closeProjectorWindow()
     compositor.stop()
