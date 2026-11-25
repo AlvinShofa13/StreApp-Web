@@ -62,6 +62,7 @@ export function useStudio() {
 
   const sourceStatuses = reactive<Record<string, SourceStatus>>({})
   const audioChannels = ref<AudioChannelInfo[]>([])
+  const headphonesConfirmed = ref(false)
   const videoDevices = ref<MediaDeviceInfo[]>([])
   const audioDevices = ref<MediaDeviceInfo[]>([])
 
@@ -530,19 +531,69 @@ export function useStudio() {
 
   // ---------------- Audio Mixer ----------------
 
+  function setHeadphonesConfirmed(confirmed: boolean): void {
+    headphonesConfirmed.value = confirmed
+    audioMixer.setHeadphonesConfirmed(confirmed)
+  }
+
+  /** Mikrofon suara (voice mic): default monitor MATI agar tidak memicu bunyi nging/feedback. */
   async function addMicSource(deviceId?: string, label?: string): Promise<void> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: deviceId
-          ? { deviceId: { exact: deviceId }, echoCancellation: false, noiseSuppression: true, autoGainControl: false }
-          : { echoCancellation: false, noiseSuppression: true, autoGainControl: false },
+          ? {
+              deviceId: { exact: deviceId },
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: false,
+            }
+          : {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: false,
+            },
         video: false,
       })
       await refreshDevices()
-      const trackLabel = stream.getAudioTracks()[0]?.label || label || 'Mikrofon'
-      audioMixer.addStream(newId(), trackLabel, deviceId ? 'DEVICE' : 'MIC', stream, true)
+      const track = stream.getAudioTracks()[0]
+      const trackLabel = track?.label || label || 'Mikrofon'
+      const realId = track?.getSettings().deviceId || deviceId
+      audioMixer.addStream(newId(), trackLabel, 'MIC', stream, true, realId, 'OFF')
     } catch (e) {
       errorMessage.value = e instanceof Error ? `Gagal membuka mikrofon: ${e.message}` : 'Gagal membuka mikrofon.'
+    }
+  }
+
+  /**
+   * Audio Capture Card USB / Perangkat Eksternal (Line-In / HDMI Audio):
+   * Tanpa pemrosesan suara voice (echoCancellation/noiseSuppression mati agar audio game jernih)
+   * dan default MONITOR_AND_RECORD supaya langsung terdengar tanpa bentrok dengan mikrofon.
+   */
+  async function addExternalAudioSource(deviceId?: string, label?: string): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: deviceId
+          ? {
+              deviceId: { exact: deviceId },
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            }
+          : {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            },
+        video: false,
+      })
+      await refreshDevices()
+      const track = stream.getAudioTracks()[0]
+      const trackLabel = track?.label || label || 'Audio Capture Card / Eksternal'
+      const realId = track?.getSettings().deviceId || deviceId
+      audioMixer.addStream(newId(), trackLabel, 'USB', stream, true, realId, 'MONITOR_AND_RECORD')
+    } catch (e) {
+      errorMessage.value =
+        e instanceof Error ? `Gagal membuka audio eksternal: ${e.message}` : 'Gagal membuka audio eksternal.'
     }
   }
 
@@ -724,6 +775,7 @@ export function useStudio() {
     reviewRecording,
     sourceStatuses,
     audioChannels,
+    headphonesConfirmed,
     videoDevices,
     audioDevices,
     screens,
@@ -764,7 +816,9 @@ export function useStudio() {
     moveSourceLayer,
     removeSource,
     applyTemplate,
+    setHeadphonesConfirmed,
     addMicSource,
+    addExternalAudioSource,
     setPreset,
     setResolution,
     setCanvasPortrait,

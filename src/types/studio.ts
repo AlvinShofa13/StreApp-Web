@@ -61,7 +61,8 @@ export interface Project {
 export interface AudioChannelInfo {
   id: string
   label: string
-  kind: 'MIC' | 'SCREEN' | 'DEVICE'
+  kind: 'MIC' | 'USB' | 'SCREEN'
+  deviceId?: string
   gain: number
   muted: boolean
   monitor: MonitorMode

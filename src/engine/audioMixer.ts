@@ -4,6 +4,7 @@ interface AudioChannelNode {
   id: string
   label: string
   kind: AudioChannelInfo['kind']
+  deviceId?: string
   stream: MediaStream
   ownsStream: boolean
   sourceNode: MediaStreamAudioSourceNode
@@ -19,17 +20,21 @@ interface AudioChannelNode {
 
 /**
  * Mixer audio berbasis Web Audio API:
- * Mencampur beberapa input (mikrofon, capture card audio, audio tab/layar)
- * ke satu keluaran rekaman + monitoring headphone terpisah.
+ * - Memisahkan saluran Mikrofon (MIC) dari Audio Eksternal/Capture Card (USB) dan Audio Layar (SCREEN).
+ * - Proteksi anti-feedback: monitoring saluran MIC otomatis diblokir bila headphone belum dikonfirmasi,
+ *   sedangkan audio Capture Card / Eksternal (USB) dan Audio Layar tetap dapat didengar langsung tanpa bunyi nging.
  */
 export class WebAudioMixer {
   private ctx: AudioContext | null = null
   private destination: MediaStreamAudioDestinationNode | null = null
   private channels = new Map<string, AudioChannelNode>()
+  private headphonesConfirmed = false
 
   private ensureContext(): AudioContext {
     if (!this.ctx) {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
       this.ctx = new AudioCtx({ sampleRate: 48000 })
       this.destination = this.ctx.createMediaStreamDestination()
     }
@@ -39,12 +44,21 @@ export class WebAudioMixer {
     return this.ctx
   }
 
+  setHeadphonesConfirmed(confirmed: boolean): void {
+    this.headphonesConfirmed = confirmed
+    for (const ch of this.channels.values()) {
+      this.applyRouting(ch)
+    }
+  }
+
   addStream(
     id: string,
     label: string,
     kind: AudioChannelInfo['kind'],
     stream: MediaStream,
     ownsStream = true,
+    deviceId?: string,
+    initialMonitor?: MonitorMode,
   ): boolean {
     if (stream.getAudioTracks().length === 0) return false
     if (this.channels.has(id)) return true
@@ -60,9 +74,9 @@ export class WebAudioMixer {
     const analyser = ctx.createAnalyser()
     analyser.fftSize = 256
 
-    masterGain.gain.value = 1
-    recordGain.gain.value = 1
-    monitorGain.gain.value = 0 // default MonitorMode.OFF
+    // Default: USB Capture Card / Screen langsung Monitor & Rekam; Mic default Mati (anti-feedback)
+    const defaultMonitor: MonitorMode =
+      initialMonitor ?? (kind === 'USB' || kind === 'SCREEN' ? 'MONITOR_AND_RECORD' : 'OFF')
 
     sourceNode.connect(masterGain)
     masterGain.connect(analyser)
@@ -71,10 +85,11 @@ export class WebAudioMixer {
     recordGain.connect(dest)
     monitorGain.connect(ctx.destination)
 
-    this.channels.set(id, {
+    const node: AudioChannelNode = {
       id,
       label,
       kind,
+      deviceId,
       stream,
       ownsStream,
       sourceNode,
@@ -85,8 +100,10 @@ export class WebAudioMixer {
       meterBuf: new Uint8Array(new ArrayBuffer(analyser.fftSize)),
       gain: 1,
       muted: false,
-      monitor: 'OFF',
-    })
+      monitor: defaultMonitor,
+    }
+    this.applyRouting(node)
+    this.channels.set(id, node)
     return true
   }
 
@@ -128,7 +145,9 @@ export class WebAudioMixer {
   private applyRouting(ch: AudioChannelNode): void {
     ch.masterGain.gain.value = ch.muted ? 0 : ch.gain
     const toRecord = ch.monitor === 'OFF' || ch.monitor === 'MONITOR_AND_RECORD'
-    const toMonitor = ch.monitor === 'MONITOR_ONLY' || ch.monitor === 'MONITOR_AND_RECORD'
+    const allowMonitor = ch.kind !== 'MIC' || this.headphonesConfirmed
+    const toMonitor =
+      allowMonitor && (ch.monitor === 'MONITOR_ONLY' || ch.monitor === 'MONITOR_AND_RECORD')
     ch.recordGain.gain.value = toRecord ? 1 : 0
     ch.monitorGain.gain.value = toMonitor ? 1 : 0
   }
@@ -148,6 +167,7 @@ export class WebAudioMixer {
         id: ch.id,
         label: ch.label,
         kind: ch.kind,
+        deviceId: ch.deviceId,
         gain: ch.gain,
         muted: ch.muted,
         monitor: ch.monitor,
