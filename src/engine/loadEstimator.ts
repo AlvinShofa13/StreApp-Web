@@ -16,7 +16,8 @@ export function estimateLoad(
   let sourceScore = 0
   for (const s of visible) {
     if (s.type === 'SCREEN') sourceScore += 2.0
-    else if (s.type === 'CAMERA') sourceScore += 1.4
+    else if (s.type === 'CAMERA' || s.type === 'REMOTE_WIFI') sourceScore += 1.4
+    else if (s.type === 'VIDEO') sourceScore += 0.8
     else if (s.type === 'IMAGE' || s.type === 'TEXT') sourceScore += 0.2
     else sourceScore += 0.1
   }

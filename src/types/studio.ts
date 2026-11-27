@@ -1,4 +1,4 @@
-export type SourceType = 'CAMERA' | 'SCREEN' | 'TEXT' | 'IMAGE' | 'TEST'
+export type SourceType = 'CAMERA' | 'SCREEN' | 'REMOTE_WIFI' | 'TEXT' | 'IMAGE' | 'VIDEO' | 'TEST'
 export type LayerShape = 'RECT' | 'ROUNDED' | 'CIRCLE'
 export type SceneTransition = 'CUT' | 'FADE'
 export type MonitorMode = 'OFF' | 'MONITOR_ONLY' | 'MONITOR_AND_RECORD'

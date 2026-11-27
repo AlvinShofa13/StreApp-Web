@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Download, Monitor, RefreshCw, Upload } from 'lucide-vue-next'
+import { Check, Copy, Download, Monitor, RefreshCw, Smartphone, Upload, Wifi } from 'lucide-vue-next'
 import {
   PRESETS,
   RESOLUTIONS,
@@ -10,6 +10,7 @@ import {
   type ScreenTarget,
 } from '../types/studio'
 import type { LoadEstimate } from '../engine/loadEstimator'
+import type { WifiPairingStatus } from '../engine/wifiPairing'
 
 const props = defineProps<{
   project: Project
@@ -19,6 +20,10 @@ const props = defineProps<{
   screens: ScreenTarget[]
   selectedScreenId: string
   supportsMultiScreenApi: boolean
+  wifiHostStatus: WifiPairingStatus
+  wifiOfferCode: string
+  wifiShareUrl: string
+  wifiError: string | null
 }>()
 
 const emit = defineEmits<{
@@ -30,11 +35,39 @@ const emit = defineEmits<{
   (e: 'detect-screens'): void
   (e: 'select-screen', id: string): void
   (e: 'open-projector'): void
+  (e: 'start-wifi-host'): void
+  (e: 'accept-wifi-answer', code: string): void
+  (e: 'stop-wifi-host'): void
+  (e: 'open-wifi-node-mode'): void
   (e: 'export-project'): void
   (e: 'import-project', file: File): void
 }>()
 
 const importInputRef = ref<HTMLInputElement | null>(null)
+const answerInput = ref('')
+const copiedOffer = ref(false)
+const copiedLink = ref(false)
+
+async function copyText(text: string, which: 'offer' | 'link'): Promise<void> {
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    if (which === 'offer') {
+      copiedOffer.value = true
+      window.setTimeout(() => { copiedOffer.value = false }, 2000)
+    } else {
+      copiedLink.value = true
+      window.setTimeout(() => { copiedLink.value = false }, 2000)
+    }
+  } catch {
+    // Abaikan jika browser memblokir clipboard
+  }
+}
+
+function submitWifiAnswer(): void {
+  if (!answerInput.value.trim()) return
+  emit('accept-wifi-answer', answerInput.value.trim())
+}
 
 function onImportFile(ev: Event): void {
   const input = ev.target as HTMLInputElement
@@ -208,6 +241,81 @@ function loadAlertClass(): string {
       >
         Buka Jendela Proyektor di Layar Terpilih
       </button>
+    </div>
+
+    <!-- Pairing Kamera Nirkabel via Wi-Fi (WebRTC P2P) -->
+    <div class="card col-gap">
+      <div class="card-title-row">
+        <div class="row-gap">
+          <Wifi :size="15" color="#3D6FA5" />
+          <h3 class="card-title">Kamera Nirkabel via Wi-Fi (WebRTC)</h3>
+        </div>
+        <span
+          class="badge"
+          :class="wifiHostStatus === 'CONNECTED' ? 'badge-success' : wifiHostStatus === 'ERROR' ? 'badge-record' : 'badge-accent'"
+        >
+          {{
+            wifiHostStatus === 'CONNECTED'
+              ? 'Tersambung'
+              : wifiHostStatus === 'WAITING_ANSWER'
+                ? 'Menunggu Answer'
+                : wifiHostStatus === 'CONNECTING' || wifiHostStatus === 'PREPARING'
+                  ? 'Menyambungkan…'
+                  : 'Siaga'
+          }}
+        </span>
+      </div>
+
+      <p class="hint-text">
+        Sambungkan kamera HP atau perangkat lain lewat Wi-Fi yang sama secara Peer-to-Peer (selain kabel USB).
+      </p>
+
+      <div v-if="wifiError" class="alert alert-error">{{ wifiError }}</div>
+
+      <div v-if="!wifiOfferCode" class="row-gap">
+        <button class="btn btn-accent-outline btn-sm" style="flex: 1" type="button" @click="emit('start-wifi-host')">
+          <Wifi :size="14" />
+          <span>Buat Sesi Wi-Fi (Host)</span>
+        </button>
+        <button class="btn btn-sm" style="flex: 1" type="button" @click="emit('open-wifi-node-mode')">
+          <Smartphone :size="14" />
+          <span>Mode Kamera Pengirim</span>
+        </button>
+      </div>
+
+      <template v-else>
+        <div class="section-label">1. Bagikan Tautan / Kode Offer ke HP Kedua</div>
+        <textarea :value="wifiOfferCode" class="input" rows="2" readonly style="font-size: 11px"></textarea>
+        <div class="row-gap">
+          <button class="btn btn-sm" style="flex: 1" type="button" @click="copyText(wifiOfferCode, 'offer')">
+            <Check v-if="copiedOffer" :size="13" />
+            <Copy v-else :size="13" />
+            <span>{{ copiedOffer ? 'Kode Tersalin' : 'Salin Kode Offer' }}</span>
+          </button>
+          <button class="btn btn-sm" style="flex: 1" type="button" @click="copyText(wifiShareUrl, 'link')">
+            <Check v-if="copiedLink" :size="13" />
+            <Copy v-else :size="13" />
+            <span>{{ copiedLink ? 'Tautan Tersalin' : 'Salin Tautan Pengirim' }}</span>
+          </button>
+        </div>
+
+        <div class="section-label">2. Tempel Kode Answer dari HP Kedua</div>
+        <textarea
+          v-model="answerInput"
+          class="input"
+          rows="2"
+          placeholder="Tempel Kode Answer dari perangkat pengirim di sini…"
+          style="font-size: 11px"
+        ></textarea>
+        <div class="row-gap">
+          <button class="btn btn-primary btn-sm" style="flex: 1" type="button" @click="submitWifiAnswer">
+            Sambungkan Kamera Wi-Fi
+          </button>
+          <button class="btn btn-sm" type="button" @click="answerInput = ''; emit('stop-wifi-host')">
+            Tutup Sesi
+          </button>
+        </div>
+      </template>
     </div>
 
     <!-- Ekspor / Impor Proyek JSON (Tanpa Database) -->

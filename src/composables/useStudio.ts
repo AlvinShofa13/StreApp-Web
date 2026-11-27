@@ -26,6 +26,7 @@ import { StudioRecorder } from '../engine/recorder'
 import { estimateLoad } from '../engine/loadEstimator'
 import { ScreenProjectorManager } from '../engine/screenManager'
 import { ChatClient, appendCappedMessage } from '../engine/chatClient'
+import { WifiHostSession, type WifiPairingStatus } from '../engine/wifiPairing'
 
 const STORAGE_KEY = 'streapp-web-project-v1'
 
@@ -79,6 +80,23 @@ export function useStudio() {
   const chatStatus = ref<ChatConnectionState>('DISCONNECTED')
   const chatFilterBots = ref(false)
   const chatFilterCommands = ref(true)
+
+  // Wi-Fi Camera Pairing (WebRTC P2P Host)
+  const wifiHost = new WifiHostSession()
+  const wifiHostStatus = ref<WifiPairingStatus>('IDLE')
+  const wifiOfferCode = ref('')
+  const wifiShareUrl = ref('')
+  const wifiError = ref<string | null>(null)
+  let activeWifiSourceId: string | null = null
+
+  wifiHost.onStatus = (st, msg) => {
+    wifiHostStatus.value = st
+    if (msg) wifiError.value = msg
+  }
+
+  wifiHost.onStream = (stream, label) => {
+    void attachWifiRemoteStream(stream, label)
+  }
 
   const stats = reactive({
     actualFps: 0,
@@ -399,6 +417,115 @@ export function useStudio() {
       saveProject()
     }
     reader.readAsDataURL(file)
+  }
+
+  function addVideoOverlay(file: File): void {
+    const scene = activeScene.value
+    if (!scene) return
+    const objectUrl = URL.createObjectURL(file)
+    const id = newId()
+    const video = document.createElement('video')
+    video.src = objectUrl
+    video.loop = true
+    video.muted = true
+    video.playsInline = true
+    video.autoplay = true
+    video.play().catch(() => {
+      // Abaikan jika browser menunda autoplay
+    })
+
+    compositor.setRuntime(id, { sourceId: id, video, objectUrl })
+    scene.sources.push({
+      id,
+      type: 'VIDEO',
+      name: file.name.replace(/\.[^.]+$/, '') || 'Overlay Video',
+      visible: true,
+      mirrored: false,
+      transform: { x: 0.05, y: 0.05, width: 0.36, height: 0.28 },
+      shape: 'RECT',
+    })
+    sourceStatuses[id] = 'ACTIVE'
+    selectedSourceId.value = id
+    saveProject()
+  }
+
+  async function attachWifiRemoteStream(stream: MediaStream, label: string): Promise<void> {
+    const scene = activeScene.value
+    if (!scene) return
+
+    let id = activeWifiSourceId
+    const existing = id ? scene.sources.find((s) => s.id === id) : undefined
+    if (!existing) {
+      id = newId()
+      activeWifiSourceId = id
+      const isFirst = scene.sources.length === 0
+      scene.sources.push({
+        id,
+        type: 'REMOTE_WIFI',
+        name: label,
+        visible: true,
+        mirrored: false,
+        transform: isFirst
+          ? { x: 0, y: 0, width: 1, height: 1 }
+          : { x: 0.64, y: 0.06, width: 0.32, height: 0.42 },
+        shape: isFirst ? 'RECT' : 'ROUNDED',
+      })
+      selectedSourceId.value = id
+      saveProject()
+    }
+
+    const video = document.createElement('video')
+    video.srcObject = stream
+    video.muted = true
+    video.playsInline = true
+    try {
+      await video.play()
+    } catch {
+      // Abaikan jika menunggu frame pertama
+    }
+
+    if (id) {
+      compositor.setRuntime(id, { sourceId: id, video, stream })
+      sourceStatuses[id] = 'ACTIVE'
+      if (stream.getAudioTracks().length > 0) {
+        audioMixer.addStream(`audio-${id}`, 'Audio Kamera Wi-Fi', 'USB', stream, false)
+      }
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+        if (id) sourceStatuses[id] = 'DISCONNECTED'
+      })
+    }
+  }
+
+  async function startWifiHost(): Promise<void> {
+    wifiError.value = null
+    try {
+      const { offerCode, shareUrl } = await wifiHost.createOffer()
+      wifiOfferCode.value = offerCode
+      wifiShareUrl.value = shareUrl
+    } catch (e) {
+      wifiHostStatus.value = 'ERROR'
+      wifiError.value = e instanceof Error ? e.message : 'Gagal membuat sesi Host Wi-Fi.'
+    }
+  }
+
+  async function acceptWifiAnswer(answerCode: string): Promise<void> {
+    wifiError.value = null
+    try {
+      await wifiHost.acceptAnswer(answerCode)
+    } catch (e) {
+      wifiError.value = e instanceof Error ? e.message : 'Kode Answer tidak valid.'
+    }
+  }
+
+  function stopWifiHost(): void {
+    wifiHost.close()
+    wifiOfferCode.value = ''
+    wifiShareUrl.value = ''
+    wifiError.value = null
+    if (activeWifiSourceId) {
+      sourceStatuses[activeWifiSourceId] = 'DISCONNECTED'
+      activeWifiSourceId = null
+    }
   }
 
   function addTestPattern(): void {
@@ -756,6 +883,7 @@ export function useStudio() {
     document.removeEventListener('fullscreenchange', onFsChange)
     navigator.mediaDevices?.removeEventListener?.('devicechange', onDeviceChange)
     chatClient.disconnect()
+    wifiHost.close()
     projectorManager.closeProjectorWindow()
     compositor.stop()
     audioMixer.dispose()
@@ -811,7 +939,15 @@ export function useStudio() {
     addScreenCapture,
     addTextOverlay,
     addImageOverlay,
+    addVideoOverlay,
     addTestPattern,
+    wifiHostStatus,
+    wifiOfferCode,
+    wifiShareUrl,
+    wifiError,
+    startWifiHost,
+    acceptWifiAnswer,
+    stopWifiHost,
     updateSourceTransform,
     setSourceVisible,
     setSourceShape,

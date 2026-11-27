@@ -6,6 +6,7 @@ import {
   Camera,
   Eye,
   EyeOff,
+  Film,
   FlipHorizontal,
   Image as ImageIcon,
   Maximize,
@@ -15,6 +16,7 @@ import {
   Target,
   Trash2,
   Type,
+  Wifi,
   X,
 } from 'lucide-vue-next'
 import type {
@@ -38,6 +40,8 @@ const emit = defineEmits<{
   (e: 'add-screen'): void
   (e: 'add-text', text: string): void
   (e: 'add-image', file: File): void
+  (e: 'add-video', file: File): void
+  (e: 'open-wifi-pairing'): void
   (e: 'add-test'): void
   (e: 'refresh-devices'): void
   (e: 'update-transform', id: string, t: Transform): void
@@ -56,6 +60,7 @@ const showTextModal = ref(false)
 const textInput = ref('')
 const keepRatio = ref(true)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const videoInputRef = ref<HTMLInputElement | null>(null)
 
 const selectedSource = computed(() =>
   props.sources.find((s) => s.id === props.selectedSourceId) ?? null,
@@ -88,6 +93,15 @@ function onFileChange(ev: Event): void {
   const file = input.files?.[0]
   if (file) {
     emit('add-image', file)
+    input.value = ''
+  }
+}
+
+function onVideoFileChange(ev: Event): void {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) {
+    emit('add-video', file)
     input.value = ''
   }
 }
@@ -232,8 +246,10 @@ const shapes: Array<{ id: LayerShape; label: string }> = [
           <div class="layer-meta">
             <Camera v-if="src.type === 'CAMERA'" :size="16" />
             <Monitor v-else-if="src.type === 'SCREEN'" :size="16" />
+            <Wifi v-else-if="src.type === 'REMOTE_WIFI'" :size="16" color="#3D6FA5" />
             <Type v-else-if="src.type === 'TEXT'" :size="16" />
             <ImageIcon v-else-if="src.type === 'IMAGE'" :size="16" />
+            <Film v-else-if="src.type === 'VIDEO'" :size="16" color="#3D6FA5" />
             <Sliders v-else :size="16" />
 
             <div class="layer-text">
@@ -311,6 +327,13 @@ const shapes: Array<{ id: LayerShape; label: string }> = [
       style="display: none"
       @change="onFileChange"
     />
+    <input
+      ref="videoInputRef"
+      type="file"
+      accept="video/*"
+      style="display: none"
+      @change="onVideoFileChange"
+    />
 
     <!-- Modal Tambah Sumber -->
     <div v-if="showAddModal" class="modal-backdrop" @click.self="showAddModal = false">
@@ -344,6 +367,18 @@ const shapes: Array<{ id: LayerShape; label: string }> = [
             <div>
               <div class="pick-title">Capture Card USB / Webcam / HP via Kabel USB</div>
               <div class="pick-sub">Mendukung Capture Card UVC, Webcam, atau ponsel Android (mode USB Webcam / HDMI Capture)</div>
+            </div>
+          </button>
+
+          <button
+            class="source-pick-btn"
+            type="button"
+            @click="emit('open-wifi-pairing'); showAddModal = false"
+          >
+            <Wifi :size="18" color="#4F8A6B" />
+            <div>
+              <div class="pick-title">Kamera HP / Perangkat Lain via Wi-Fi (WebRTC)</div>
+              <div class="pick-sub">Pairing nirkabel langsung lewat Wi-Fi lokal tanpa kabel USB dan tanpa server berbayar</div>
             </div>
           </button>
 
@@ -386,6 +421,18 @@ const shapes: Array<{ id: LayerShape; label: string }> = [
             <div>
               <div class="pick-title">Overlay Gambar / Logo</div>
               <div class="pick-sub">PNG/JPG dari perangkat Anda</div>
+            </div>
+          </button>
+
+          <button
+            class="source-pick-btn"
+            type="button"
+            @click="showAddModal = false; videoInputRef?.click()"
+          >
+            <Film :size="18" color="#3D6FA5" />
+            <div>
+              <div class="pick-title">Overlay Video (Loop MP4 / WebM)</div>
+              <div class="pick-sub">Video latar, intro, atau animasi berulang langsung di atas kanvas</div>
             </div>
           </button>
 

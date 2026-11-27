@@ -5,15 +5,15 @@
 <h1 align="center">StreApp Web</h1>
 
 <p align="center">
-  <strong>Versi web open-source dari StreApp (OBS ringkas di browser) dibangun dengan Vue 3, TypeScript, dan Vite — 100% client-side tanpa database, siap deploy ke Vercel.</strong>
+  <strong>Versi web open-source dari StreApp yang terinspirasi dari OBS di browser, dibangun dengan Vue 3, TypeScript, dan Vite — 100% client-side tanpa database, siap deploy ke Vercel.</strong>
 </p>
 
 ---
 
 ## Fitur Utama
 
-- **Kompositor Multi-Sumber Real-Time:** Gabungkan Capture Card USB (UVC), Webcam, Rekam Layar/Tab/Jendela, Overlay Teks, dan Logo dalam satu kanvas.
-- **Kanvas OBS Interaktif:** Ketuk sumber untuk memindah posisi (dengan *snap* otomatis ke tepi/tengah), tarik 4 sudut atau gunakan slider untuk mengatur besar-kecil ukuran, pilih bentuk (**Persegi / Membulat / Bulat**), balik cermin, dan atur urutan layer.
+- **Kompositor Multi-Sumber Real-Time:** Gabungkan Capture Card USB (UVC), Webcam, Kamera HP via Wi-Fi (WebRTC P2P), Rekam Layar/Tab/Jendela, Overlay Teks, Gambar/Logo, dan Overlay Video Loop dalam satu kanvas.
+- **Kanvas Scene Interaktif:** Ketuk sumber untuk memindah posisi (dengan *snap* otomatis ke tepi/tengah), tarik 4 sudut atau gunakan slider untuk mengatur besar-kecil ukuran, pilih bentuk (**Persegi / Membulat / Bulat**), balik cermin, dan atur urutan layer.
 - **Pratinjau Layar Penuh & Proyektor Multi-Layar:**
   - Mode **Layar Penuh** satu klik langsung dari pratinjau.
   - **Pilih Layar (Multi-Monitor):** Mendeteksi daftar monitor lewat *Window Management API* (Chrome/Edge) untuk menampilkan pratinjau layar penuh atau membuka **Jendela Proyektor** terpisah di monitor kedua sementara panel kontrol tetap berada di monitor utama.

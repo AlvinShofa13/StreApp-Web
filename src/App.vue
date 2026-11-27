@@ -18,12 +18,24 @@ import AudioMixerPanel from './components/AudioMixerPanel.vue'
 import StreamChatPanel from './components/StreamChatPanel.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import ReviewModal from './components/ReviewModal.vue'
+import WifiCameraNodeView from './components/WifiCameraNodeView.vue'
 
 type DockTab = 'SOURCES' | 'MIXER' | 'STREAM' | 'SETTINGS'
 
 const studio = useStudio()
 const activeTab = ref<DockTab>('SOURCES')
 const showDock = ref(true)
+const isWifiNodeMode = ref(
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('wifiNode') === '1',
+)
+
+function openWifiPairingInSettings(): void {
+  activeTab.value = 'SETTINGS'
+  showDock.value = true
+  if (!studio.wifiOfferCode.value) {
+    void studio.startWifiHost()
+  }
+}
 
 const recDurationShort = computed(() => {
   const sec = Math.floor(studio.recordingMs.value / 1000)
@@ -50,7 +62,8 @@ const loadBadgeText = computed(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <WifiCameraNodeView v-if="isWifiNodeMode" @exit="isWifiNodeMode = false" />
+  <div v-else class="app-shell">
     <!-- Top Bar -->
     <header class="topbar">
       <div class="topbar-brand">
@@ -223,6 +236,8 @@ const loadBadgeText = computed(() => {
           @add-screen="studio.addScreenCapture"
           @add-text="studio.addTextOverlay"
           @add-image="studio.addImageOverlay"
+          @add-video="studio.addVideoOverlay"
+          @open-wifi-pairing="openWifiPairingInSettings"
           @add-test="studio.addTestPattern"
           @refresh-devices="studio.refreshDevices"
           @update-transform="studio.updateSourceTransform"
@@ -273,6 +288,10 @@ const loadBadgeText = computed(() => {
           :screens="studio.screens.value"
           :selected-screen-id="studio.selectedScreenId.value"
           :supports-multi-screen-api="studio.supportsMultiScreenApi"
+          :wifi-host-status="studio.wifiHostStatus.value"
+          :wifi-offer-code="studio.wifiOfferCode.value"
+          :wifi-share-url="studio.wifiShareUrl.value"
+          :wifi-error="studio.wifiError.value"
           @set-preset="studio.setPreset"
           @set-resolution="studio.setResolution"
           @set-portrait="studio.setCanvasPortrait"
@@ -281,6 +300,10 @@ const loadBadgeText = computed(() => {
           @detect-screens="studio.detectScreens"
           @select-screen="studio.selectedScreenId.value = $event"
           @open-projector="studio.openProjectorOnSelectedScreen"
+          @start-wifi-host="studio.startWifiHost"
+          @accept-wifi-answer="studio.acceptWifiAnswer"
+          @stop-wifi-host="studio.stopWifiHost"
+          @open-wifi-node-mode="isWifiNodeMode = true"
           @export-project="studio.exportProjectJson"
           @import-project="studio.importProjectJson"
         />

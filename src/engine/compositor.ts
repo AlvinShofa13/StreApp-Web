@@ -5,6 +5,7 @@ export interface VideoLayerRuntime {
   video?: HTMLVideoElement
   image?: HTMLImageElement
   stream?: MediaStream
+  objectUrl?: string
 }
 
 export interface CompositorStats {
@@ -77,7 +78,12 @@ export class CanvasCompositor {
       existing.stream.getTracks().forEach((t) => t.stop())
     }
     if (existing?.video) {
+      existing.video.pause()
       existing.video.srcObject = null
+      existing.video.removeAttribute('src')
+    }
+    if (existing?.objectUrl) {
+      URL.revokeObjectURL(existing.objectUrl)
     }
     this.runtimes.delete(sourceId)
   }
@@ -191,7 +197,7 @@ export class CanvasCompositor {
       ctx.save()
       this.applyShapeClip(ctx, src.shape, x, y, w, h)
 
-      if (src.type === 'CAMERA' || src.type === 'SCREEN') {
+      if (src.type === 'CAMERA' || src.type === 'SCREEN' || src.type === 'VIDEO' || src.type === 'REMOTE_WIFI') {
         const rt = this.runtimes.get(src.id)
         const vid = rt?.video
         if (vid && vid.readyState >= 2 && vid.videoWidth > 0 && vid.videoHeight > 0) {
